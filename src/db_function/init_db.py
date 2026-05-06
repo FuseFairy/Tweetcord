@@ -9,10 +9,12 @@ log = setup_logger(__name__)
 
 
 async def init_db():
-    if not os.path.exists(os.getenv('DATA_PATH')):
-        os.mkdir(os.getenv('DATA_PATH'))
+    if not os.path.exists(os.getenv("DATA_PATH")):
+        os.mkdir(os.getenv("DATA_PATH"))
 
-    async with aiosqlite.connect(os.path.join(os.getenv('DATA_PATH'), 'tracked_accounts.db')) as db:
+    async with aiosqlite.connect(
+        os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
+    ) as db:
         await db.executescript("""
             CREATE TABLE IF NOT EXISTS user (id TEXT PRIMARY KEY, username TEXT, latest_tweet TEXT, client_used TEXT, enabled INTEGER DEFAULT 1);
             CREATE TABLE IF NOT EXISTS channel (id TEXT PRIMARY KEY, server_id TEXT);
@@ -21,12 +23,12 @@ async def init_db():
         """)
         await db.commit()
 
-    log.info('database file not found, a blank database file has been created')
+    log.info("database file not found, a blank database file has been created")
 
 
 async def init_latest_tweet_on_startup(db_path: str):
     async with aiosqlite.connect(db_path) as db:
-        await db.execute('UPDATE user SET latest_tweet = ?', (get_utcnow(),))
+        await db.execute("UPDATE user SET latest_tweet = ?", (get_utcnow(),))
         await db.commit()
 
-    log.info('all latest_tweet timestamps have been updated to current time')
+    log.info("all latest_tweet timestamps have been updated to current time")

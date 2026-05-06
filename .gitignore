@@ -174,3 +174,9 @@ configs/configs.generated.yml
 
 # fly.io
 fly.toml
+
+#gemini
+.gemini
+
+# ruff
+.ruff_cache

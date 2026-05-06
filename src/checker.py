@@ -7,15 +7,12 @@ from src.log import setup_logger
 
 log = setup_logger(__name__)
 
-VALID_PROXY_SERVICES = {
-    'fx': ['fxtwitter', 'fixupx'],
-    'vx': ['vxtwitter', 'fixvx']
-}
+VALID_PROXY_SERVICES = {"fx": ["fxtwitter", "fixupx"], "vx": ["vxtwitter", "fixvx"]}
 
 
 def build_and_validate_configs():
     try:
-        with open('configs.example.yml', 'r', encoding='utf-8') as f:
+        with open("configs.example.yml", "r", encoding="utf-8") as f:
             default_configs = yaml.safe_load(f)
     except FileNotFoundError:
         log.error("configs.example.yml not found! Cannot proceed.")
@@ -23,19 +20,21 @@ def build_and_validate_configs():
 
     use_defaults = False
     try:
-        with open('configs.yml', 'r', encoding='utf-8') as f:
+        with open("configs.yml", "r", encoding="utf-8") as f:
             user_configs = yaml.safe_load(f)
         if not isinstance(user_configs, dict):
             # Handle empty or invalid YAML file
             use_defaults = True
-            log.warning("configs.yml is empty or invalid. Using default values for all settings.")
+            log.warning(
+                "configs.yml is empty or invalid. Using default values for all settings."
+            )
     except FileNotFoundError:
         use_defaults = True
         log.info("configs.yml not found. Using default values for all settings.")
 
     final_configs = deepcopy(default_configs)
 
-    def merge_and_validate(default_section, user_section, final_section, path=''):
+    def merge_and_validate(default_section, user_section, final_section, path=""):
         for key, default_value in default_section.items():
             current_path = f"{path}.{key}" if path else key
             user_value = user_section.get(key)
@@ -43,20 +42,33 @@ def build_and_validate_configs():
             if isinstance(default_value, dict):
                 # Recurse into nested dictionaries
                 user_subsection = user_value if isinstance(user_value, dict) else {}
-                merge_and_validate(default_value, user_subsection, final_section[key], path=current_path)
+                merge_and_validate(
+                    default_value,
+                    user_subsection,
+                    final_section[key],
+                    path=current_path,
+                )
                 continue
 
             if user_value is None:
-                log.warning(f"'{current_path}' not found in configs.yml, using default value: '{default_value}'")
+                log.warning(
+                    f"'{current_path}' not found in configs.yml, using default value: '{default_value}'"
+                )
                 continue
 
             # --- Start Validation ---
             is_valid = True
-            if current_path == 'users_list_page_counter_position' and user_value not in ['title', 'footer']:
+            if (
+                current_path == "users_list_page_counter_position"
+                and user_value not in ["title", "footer"]
+            ):
                 is_valid = False
-            elif current_path == 'embed.type' and user_value not in ['built_in', 'proxy']:
+            elif current_path == "embed.type" and user_value not in [
+                "built_in",
+                "proxy",
+            ]:
                 is_valid = False
-            elif current_path == 'embed.proxy.service':
+            elif current_path == "embed.proxy.service":
                 if user_value not in VALID_PROXY_SERVICES:
                     is_valid = False
             # --- End Validation ---
@@ -64,28 +76,34 @@ def build_and_validate_configs():
             if is_valid:
                 final_section[key] = user_value
             else:
-                log.warning(f"invalid value for '{current_path}': '{user_value}'. Using default: '{default_value}'")
+                log.warning(
+                    f"invalid value for '{current_path}': '{user_value}'. Using default: '{default_value}'"
+                )
 
     if not use_defaults:
         merge_and_validate(default_configs, user_configs, final_configs)
-    
+
     # Because these settings have dependencies, they are checked outside the recursion
-    proxy_service = final_configs['embed']['proxy']['service']
-    proxy_domain = final_configs['embed']['proxy']['domain_name']
+    proxy_service = final_configs["embed"]["proxy"]["service"]
+    proxy_domain = final_configs["embed"]["proxy"]["domain_name"]
     valid_domains_for_service = VALID_PROXY_SERVICES.get(proxy_service, [])
 
     if proxy_domain not in valid_domains_for_service:
         new_domain = valid_domains_for_service[0]
-        log.warning(f"domain '{proxy_domain}' is invalid for service '{proxy_service}'. Falling back to a valid domain '{new_domain}'.")
-        final_configs['embed']['proxy']['domain_name'] = new_domain
-        
-    if proxy_service != 'fx':
-        log.warning(f"service '{proxy_service}' is not support for auto translation, disabling auto translation")
-        final_configs['embed']['proxy']['auto_translation']['enabled'] = False
+        log.warning(
+            f"domain '{proxy_domain}' is invalid for service '{proxy_service}'. Falling back to a valid domain '{new_domain}'."
+        )
+        final_configs["embed"]["proxy"]["domain_name"] = new_domain
+
+    if proxy_service != "fx":
+        log.warning(
+            f"service '{proxy_service}' is not support for auto translation, disabling auto translation"
+        )
+        final_configs["embed"]["proxy"]["auto_translation"]["enabled"] = False
 
     try:
-        os.makedirs('configs', exist_ok=True)
-        with open('configs/configs.generated.yml', 'w', encoding='utf-8') as f:
+        os.makedirs("configs", exist_ok=True)
+        with open("configs/configs.generated.yml", "w", encoding="utf-8") as f:
             f.write("# This file is automatically generated. Do not edit manually.\n")
             yaml.dump(final_configs, f, allow_unicode=True, sort_keys=False)
         log.info("successfully generated 'configs/configs.generated.yml'")
@@ -94,39 +112,49 @@ def build_and_validate_configs():
         log.error(f"failed to write 'configs/configs.generated.yml': {e}")
         return False
 
+
 def check_env():
-    required_keys = [
-        'BOT_TOKEN', 'DATA_PATH', 'TWITTER_TOKEN'
-    ]
+    required_keys = ["BOT_TOKEN", "DATA_PATH", "TWITTER_TOKEN"]
 
     missing_keys = [key for key in required_keys if key not in os.environ]
     if missing_keys:
-        log.error(f'missing required environment variables: {missing_keys}')
+        log.error(f"missing required environment variables: {missing_keys}")
         return False
 
-    twitter_token = os.getenv('TWITTER_TOKEN')
-    if not all([(lambda e : len(e) == 2 and all(e))(entry.split(':')) for entry in twitter_token.split(',')]):
-        log.error('invalid TWITTER_TOKEN format, must be in the form of "account_name:twitter_token"')
+    twitter_token = os.getenv("TWITTER_TOKEN")
+    if not all(
+        [
+            (lambda e: len(e) == 2 and all(e))(entry.split(":"))
+            for entry in twitter_token.split(",")
+        ]
+    ):
+        log.error(
+            'invalid TWITTER_TOKEN format, must be in the form of "account_name:twitter_token"'
+        )
         return False
 
-    log.info('environment variables check passed')
+    log.info("environment variables check passed")
     return True
+
 
 # currently only client_used is checked
 async def check_db() -> set[str]:
-    twitter_token = os.getenv('TWITTER_TOKEN')
-    
-    async with connect_readonly(os.path.join(os.getenv('DATA_PATH'), 'tracked_accounts.db')) as db:
-        async with db.execute('SELECT client_used FROM user') as cursor:
+    twitter_token = os.getenv("TWITTER_TOKEN")
+
+    async with connect_readonly(
+        os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
+    ) as db:
+        async with db.execute("SELECT client_used FROM user") as cursor:
             row = await cursor.fetchall()
-            
+
     db_clients = set(client[0] for client in row)
-    env_clients = set(entry.split(':')[0] for entry in twitter_token.split(','))
+    env_clients = set(entry.split(":")[0] for entry in twitter_token.split(","))
     invalid_clients = db_clients - env_clients
-    
+
     return invalid_clients
 
+
 def check_upgrade():
-    if os.path.isfile('upgrade.py'):
-        log.info('found upgrade.py, executing...')
-        os.system('python upgrade.py')
+    if os.path.isfile("upgrade.py"):
+        log.info("found upgrade.py, executing...")
+        os.system("python upgrade.py")

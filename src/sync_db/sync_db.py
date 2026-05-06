@@ -22,4 +22,4 @@ async def sync_db(follow_list: dict[str, str]) -> None:
         await app.enable_user_notification(user_id)
         await asyncio.sleep(1)
 
-    log.info('synchronization with database completed')
+    log.info("synchronization with database completed")

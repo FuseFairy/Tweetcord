@@ -12,7 +12,7 @@ _translations: dict[str, Any] = {}
 
 def _load_yaml(path: str) -> dict:
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except FileNotFoundError:
         log.error(f"i18n: locale file not found: {path}")
@@ -32,14 +32,14 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def init_i18n(lang: str = 'en') -> None:
+def init_i18n(lang: str = "en") -> None:
     global _translations
-    locales_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'locales')
-    en_path = os.path.join(locales_dir, 'en.yml')
+    locales_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "locales")
+    en_path = os.path.join(locales_dir, "en.yml")
     _translations = _load_yaml(en_path)
 
-    if lang != 'en':
-        lang_path = os.path.join(locales_dir, f'{lang}.yml')
+    if lang != "en":
+        lang_path = os.path.join(locales_dir, f"{lang}.yml")
         if os.path.isfile(lang_path):
             lang_data = _load_yaml(lang_path)
             _translations = _deep_merge(_translations, lang_data)
@@ -48,7 +48,7 @@ def init_i18n(lang: str = 'en') -> None:
 
 
 def t(key: str, **kwargs) -> str:
-    parts = key.split('.')
+    parts = key.split(".")
     node: Any = _translations
     for part in parts:
         if isinstance(node, dict) and part in node:

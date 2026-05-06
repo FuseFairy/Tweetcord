@@ -14,37 +14,98 @@ from src.log import setup_logger
 from src.notification.account_tracker import AccountTracker
 from src.permission import ADMINISTRATOR
 from src.db_function.readonly_db import connect_readonly
-from src.utils import get_accounts, get_lock, get_utcnow, validate_and_normalize_language
+from src.utils import (
+    get_accounts,
+    get_lock,
+    get_utcnow,
+    validate_and_normalize_language,
+)
 from src.presence_updater import update_presence
 
 log = setup_logger(__name__)
 lock = get_lock()
+
 
 class Notification(Cog_Extension):
     def __init__(self, bot):
         super().__init__(bot)
         self.account_tracker = AccountTracker(bot)
 
-    add_group = app_commands.Group(name='add', description=t('commands.add.description'), default_permissions=ADMINISTRATOR)
-    remove_group = app_commands.Group(name='remove', description=t('commands.remove.description'), default_permissions=ADMINISTRATOR)
-    customize_group = app_commands.Group(name='customize', description=t('commands.customize.description'), default_permissions=ADMINISTRATOR)
+    add_group = app_commands.Group(
+        name="add",
+        description=t("commands.add.description"),
+        default_permissions=ADMINISTRATOR,
+    )
+    remove_group = app_commands.Group(
+        name="remove",
+        description=t("commands.remove.description"),
+        default_permissions=ADMINISTRATOR,
+    )
+    customize_group = app_commands.Group(
+        name="customize",
+        description=t("commands.customize.description"),
+        default_permissions=ADMINISTRATOR,
+    )
 
-    @add_group.command(name='notifier', description=t('commands.add.notifier.description'))
+    @add_group.command(
+        name="notifier", description=t("commands.add.notifier.description")
+    )
     @app_commands.choices(
-        enable_type=[app_commands.Choice(name=t('commands.add.notifier.choices.enable_type.all_default'), value='11'), app_commands.Choice(name=t('commands.add.notifier.choices.enable_type.retweet_only'), value='10'), app_commands.Choice(name=t('commands.add.notifier.choices.enable_type.quote_only'), value='01'), app_commands.Choice(name=t('commands.add.notifier.choices.enable_type.tweet_only'), value='00')],
-        media_type=[app_commands.Choice(name=t('commands.add.notifier.choices.media_type.all_default'), value='11'), app_commands.Choice(name=t('commands.add.notifier.choices.media_type.no_media'), value='10'), app_commands.Choice(name=t('commands.add.notifier.choices.media_type.media_only'), value='01')],
-        account_used=[app_commands.Choice(name=account_name, value=account_name) for account_name, _ in get_accounts().items()]
+        enable_type=[
+            app_commands.Choice(
+                name=t("commands.add.notifier.choices.enable_type.all_default"),
+                value="11",
+            ),
+            app_commands.Choice(
+                name=t("commands.add.notifier.choices.enable_type.retweet_only"),
+                value="10",
+            ),
+            app_commands.Choice(
+                name=t("commands.add.notifier.choices.enable_type.quote_only"),
+                value="01",
+            ),
+            app_commands.Choice(
+                name=t("commands.add.notifier.choices.enable_type.tweet_only"),
+                value="00",
+            ),
+        ],
+        media_type=[
+            app_commands.Choice(
+                name=t("commands.add.notifier.choices.media_type.all_default"),
+                value="11",
+            ),
+            app_commands.Choice(
+                name=t("commands.add.notifier.choices.media_type.no_media"), value="10"
+            ),
+            app_commands.Choice(
+                name=t("commands.add.notifier.choices.media_type.media_only"),
+                value="01",
+            ),
+        ],
+        account_used=[
+            app_commands.Choice(name=account_name, value=account_name)
+            for account_name, _ in get_accounts().items()
+        ],
     )
-    @app_commands.rename(enable_type='type')
+    @app_commands.rename(enable_type="type")
     @app_commands.describe(
-        username=t('commands.add.notifier.params.username'),
-        channel=t('commands.add.notifier.params.channel'),
-        mention=t('commands.add.notifier.params.mention'),
-        enable_type=t('commands.add.notifier.params.type'),
-        media_type=t('commands.add.notifier.params.media_type'),
-        account_used=t('commands.add.notifier.params.account_used'),
+        username=t("commands.add.notifier.params.username"),
+        channel=t("commands.add.notifier.params.channel"),
+        mention=t("commands.add.notifier.params.mention"),
+        enable_type=t("commands.add.notifier.params.type"),
+        media_type=t("commands.add.notifier.params.media_type"),
+        account_used=t("commands.add.notifier.params.account_used"),
     )
-    async def notifier(self, itn: discord.Interaction, username: str, channel: discord.TextChannel | discord.Thread, mention: discord.Role = None, enable_type: str = '11', media_type: str = '11', account_used: str = list(get_accounts().keys())[0]):
+    async def notifier(
+        self,
+        itn: discord.Interaction,
+        username: str,
+        channel: discord.TextChannel | discord.Thread,
+        mention: discord.Role = None,
+        enable_type: str = "11",
+        media_type: str = "11",
+        account_used: str = list(get_accounts().keys())[0],
+    ):
         """Add a twitter user to specific channel on your server.
 
         Parameters
@@ -65,9 +126,11 @@ class Notification(Cog_Extension):
 
         await itn.response.defer(ephemeral=True)
 
-        async with aiosqlite.connect(os.path.join(os.getenv('DATA_PATH'), 'tracked_accounts.db')) as db:
-            await db.execute('PRAGMA synchronous = OFF')
-            await db.execute('PRAGMA count_changes = OFF')
+        async with aiosqlite.connect(
+            os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
+        ) as db:
+            await db.execute("PRAGMA synchronous = OFF")
+            await db.execute("PRAGMA count_changes = OFF")
 
             db.row_factory = aiosqlite.Row
             async with db.cursor() as cursor:
@@ -77,91 +140,199 @@ class Notification(Cog_Extension):
                     try:
                         new_user = await app.get_user_info(username)
                     except Exception:
-                        await itn.followup.send(t('notification.add.user_not_found', username=username), ephemeral=True)
+                        await itn.followup.send(
+                            t("notification.add.user_not_found", username=username),
+                            ephemeral=True,
+                        )
                         return
 
-                    await cursor.execute('SELECT * FROM user WHERE id = ?', (str(new_user.id),))
+                    await cursor.execute(
+                        "SELECT * FROM user WHERE id = ?", (str(new_user.id),)
+                    )
                     match_user = await cursor.fetchone()
 
                     server_id = str(channel.guild.id)
-                    roleID = str(mention.id) if mention is not None else ''
-                    if match_user is None or match_user['enabled'] == 0:
+                    roleID = str(mention.id) if mention is not None else ""
+                    if match_user is None or match_user["enabled"] == 0:
                         if match_user is None:
                             async with lock:
-                                await db.execute('BEGIN')
-                                await cursor.execute('INSERT INTO user (id, username, latest_tweet, client_used) VALUES (?, ?, ?, ?)', (str(new_user.id), new_user.username, get_utcnow(), account_used))
-                                await cursor.execute('INSERT OR IGNORE INTO channel VALUES (?, ?)', (str(channel.id), server_id))
-                                await cursor.execute('INSERT INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)', (str(new_user.id), str(channel.id), roleID, enable_type, media_type))
+                                await db.execute("BEGIN")
+                                await cursor.execute(
+                                    "INSERT INTO user (id, username, latest_tweet, client_used) VALUES (?, ?, ?, ?)",
+                                    (
+                                        str(new_user.id),
+                                        new_user.username,
+                                        get_utcnow(),
+                                        account_used,
+                                    ),
+                                )
+                                await cursor.execute(
+                                    "INSERT OR IGNORE INTO channel VALUES (?, ?)",
+                                    (str(channel.id), server_id),
+                                )
+                                await cursor.execute(
+                                    "INSERT INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)",
+                                    (
+                                        str(new_user.id),
+                                        str(channel.id),
+                                        roleID,
+                                        enable_type,
+                                        media_type,
+                                    ),
+                                )
                                 await db.commit()
                         else:
                             is_changed_client = False
-                            if match_user['username'] != new_user.username:
+                            if match_user["username"] != new_user.username:
                                 async with lock:
-                                    await db.execute('BEGIN')
-                                    await cursor.execute('UPDATE user SET username = ? WHERE id = ?', (new_user.username, str(new_user.id)))
+                                    await db.execute("BEGIN")
+                                    await cursor.execute(
+                                        "UPDATE user SET username = ? WHERE id = ?",
+                                        (new_user.username, str(new_user.id)),
+                                    )
                                     await db.commit()
 
-                            if match_user['client_used'] != account_used:
-                                if configs['auto_change_client']:
-                                    if configs['auto_unfollow'] or configs['auto_turn_off_notification']:
-                                        old_client_used = match_user['client_used']
+                            if match_user["client_used"] != account_used:
+                                if configs["auto_change_client"]:
+                                    if (
+                                        configs["auto_unfollow"]
+                                        or configs["auto_turn_off_notification"]
+                                    ):
+                                        old_client_used = match_user["client_used"]
                                         old_app = Twitter(old_client_used)
                                         await app.connect()
-                                        target_user = await old_app.get_user_info(username)
+                                        target_user = await old_app.get_user_info(
+                                            username
+                                        )
 
-                                        if configs['auto_unfollow']:
-                                            status = await old_app.unfollow_user(target_user)
-                                            log.info(f'successfully unfollowed {username} (due to client change)') if status else log.warning(f'unable to unfollow {username}')
+                                        if configs["auto_unfollow"]:
+                                            status = await old_app.unfollow_user(
+                                                target_user
+                                            )
+                                            log.info(
+                                                f"successfully unfollowed {username} (due to client change)"
+                                            ) if status else log.warning(
+                                                f"unable to unfollow {username}"
+                                            )
                                         else:
-                                            status = await old_app.disable_user_notification(target_user)
-                                            log.info(f'successfully turned off notification for {username} (due to client change)') if status else log.warning(f'unable to turn off notifications for {username}')
+                                            status = (
+                                                await old_app.disable_user_notification(
+                                                    target_user
+                                                )
+                                            )
+                                            log.info(
+                                                f"successfully turned off notification for {username} (due to client change)"
+                                            ) if status else log.warning(
+                                                f"unable to turn off notifications for {username}"
+                                            )
 
                                     is_changed_client = True
                                 else:
-                                    await itn.followup.send(t('notification.add.client_conflict', username=username, account_used=account_used), ephemeral=True)
+                                    await itn.followup.send(
+                                        t(
+                                            "notification.add.client_conflict",
+                                            username=username,
+                                            account_used=account_used,
+                                        ),
+                                        ephemeral=True,
+                                    )
                                     return
                             async with lock:
-                                await db.execute('BEGIN')
+                                await db.execute("BEGIN")
                                 if is_changed_client:
-                                    await cursor.execute('REPLACE INTO user (client_used) VALUES (?) WHERE id = ?', (account_used, match_user['id']))
-                                await cursor.execute('INSERT OR IGNORE INTO channel VALUES (?, ?)', (str(channel.id), server_id))
-                                await cursor.execute('REPLACE INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)', (match_user['id'], str(channel.id), roleID, enable_type, media_type))
-                                await cursor.execute('UPDATE user SET enabled = 1 WHERE id = ?', (match_user['id'],))
+                                    await cursor.execute(
+                                        "REPLACE INTO user (client_used) VALUES (?) WHERE id = ?",
+                                        (account_used, match_user["id"]),
+                                    )
+                                await cursor.execute(
+                                    "INSERT OR IGNORE INTO channel VALUES (?, ?)",
+                                    (str(channel.id), server_id),
+                                )
+                                await cursor.execute(
+                                    "REPLACE INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)",
+                                    (
+                                        match_user["id"],
+                                        str(channel.id),
+                                        roleID,
+                                        enable_type,
+                                        media_type,
+                                    ),
+                                )
+                                await cursor.execute(
+                                    "UPDATE user SET enabled = 1 WHERE id = ?",
+                                    (match_user["id"],),
+                                )
                                 await db.commit()
 
                         await app.follow_user(new_user)
 
                         status = await app.enable_user_notification(new_user)
                         if status:
-                            log.info(f'successfully turned on notification for {username}')
+                            log.info(
+                                f"successfully turned on notification for {username}"
+                            )
                         else:
-                            log.warning(f'unable to turn on notifications for {username}')
+                            log.warning(
+                                f"unable to turn on notifications for {username}"
+                            )
                     else:
                         async with lock:
-                            await db.execute('BEGIN')
-                            await cursor.execute('INSERT OR IGNORE INTO channel VALUES (?, ?)', (str(channel.id), server_id))
-                            await cursor.execute('REPLACE INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)', (match_user['id'], str(channel.id), roleID, enable_type, media_type))
+                            await db.execute("BEGIN")
+                            await cursor.execute(
+                                "INSERT OR IGNORE INTO channel VALUES (?, ?)",
+                                (str(channel.id), server_id),
+                            )
+                            await cursor.execute(
+                                "REPLACE INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)",
+                                (
+                                    match_user["id"],
+                                    str(channel.id),
+                                    roleID,
+                                    enable_type,
+                                    media_type,
+                                ),
+                            )
                             await db.commit()
                 except Exception as e:
-                    log.error(f'an error occurred while adding notifier: {e}')
-                    await itn.followup.send(t('notification.add.failed'), ephemeral=True)
+                    log.error(f"an error occurred while adding notifier: {e}")
+                    await itn.followup.send(
+                        t("notification.add.failed"), ephemeral=True
+                    )
                     await db.rollback()
                     return
 
-        if match_user is None or match_user['enabled'] == 0:
+        if match_user is None or match_user["enabled"] == 0:
             await self.account_tracker.addTask(new_user.username, account_used)
             await update_presence(self.bot)
-            await itn.followup.send(t('notification.add.success_new', username=new_user.username, account_used=account_used), ephemeral=True)
+            await itn.followup.send(
+                t(
+                    "notification.add.success_new",
+                    username=new_user.username,
+                    account_used=account_used,
+                ),
+                ephemeral=True,
+            )
         else:
-            await itn.followup.send(t('notification.add.success_update', username=match_user['username'], client_used=match_user['client_used']), ephemeral=True)
+            await itn.followup.send(
+                t(
+                    "notification.add.success_update",
+                    username=match_user["username"],
+                    client_used=match_user["client_used"],
+                ),
+                ephemeral=True,
+            )
 
-    @remove_group.command(name='notifier', description=t('commands.remove.notifier.description'))
-    @app_commands.rename(channel_id='channel')
-    @app_commands.describe(
-        channel_id=t('commands.remove.notifier.params.channel'),
-        username=t('commands.remove.notifier.params.username'),
+    @remove_group.command(
+        name="notifier", description=t("commands.remove.notifier.description")
     )
-    async def r_notifier(self, itn: discord.Interaction, channel_id: str, username: str):
+    @app_commands.rename(channel_id="channel")
+    @app_commands.describe(
+        channel_id=t("commands.remove.notifier.params.channel"),
+        username=t("commands.remove.notifier.params.username"),
+    )
+    async def r_notifier(
+        self, itn: discord.Interaction, channel_id: str, username: str
+    ):
         """Remove a notifier on your server.
 
         Parameters
@@ -174,68 +345,126 @@ class Notification(Cog_Extension):
 
         await itn.response.defer(ephemeral=True)
 
-        async with aiosqlite.connect(os.path.join(os.getenv('DATA_PATH'), 'tracked_accounts.db')) as db:
-            await db.execute('PRAGMA synchronous = OFF')
-            await db.execute('PRAGMA count_changes = OFF')
-            
+        async with aiosqlite.connect(
+            os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
+        ) as db:
+            await db.execute("PRAGMA synchronous = OFF")
+            await db.execute("PRAGMA count_changes = OFF")
+
             db.row_factory = aiosqlite.Row
             async with db.cursor() as cursor:
-                await cursor.execute('SELECT id FROM channel WHERE server_id = ?', (str(itn.guild_id),))
+                await cursor.execute(
+                    "SELECT id FROM channel WHERE server_id = ?", (str(itn.guild_id),)
+                )
                 rows = await cursor.fetchall()
-                vaild_ids = [row['id'] for row in rows]
+                vaild_ids = [row["id"] for row in rows]
                 if channel_id not in vaild_ids:
-                    await itn.followup.send(t('notification.remove.channel_not_found', channel_id=channel_id, guild_name=str(itn.guild.name)), ephemeral=True)
+                    await itn.followup.send(
+                        t(
+                            "notification.remove.channel_not_found",
+                            channel_id=channel_id,
+                            guild_name=str(itn.guild.name),
+                        ),
+                        ephemeral=True,
+                    )
                     return
                 try:
-                    
-                    await cursor.execute('SELECT user_id FROM notification, user WHERE username = ? COLLATE NOCASE AND channel_id = ? AND user_id = id AND notification.enabled = 1', (username, channel_id))
+                    await cursor.execute(
+                        "SELECT user_id FROM notification, user WHERE username = ? COLLATE NOCASE AND channel_id = ? AND user_id = id AND notification.enabled = 1",
+                        (username, channel_id),
+                    )
                     match_notifier = await cursor.fetchone()
                     if match_notifier is not None:
                         async with lock:
-                            await db.execute('BEGIN')
-                            await cursor.execute('UPDATE notification SET enabled = 0 WHERE user_id = ? AND channel_id = ?', (match_notifier['user_id'], channel_id))
-                            await itn.followup.send(t('notification.remove.success', username=username), ephemeral=True)
-                            await cursor.execute('SELECT user_id FROM notification WHERE user_id = ? AND enabled = 1', (match_notifier['user_id'],))
+                            await db.execute("BEGIN")
+                            await cursor.execute(
+                                "UPDATE notification SET enabled = 0 WHERE user_id = ? AND channel_id = ?",
+                                (match_notifier["user_id"], channel_id),
+                            )
+                            await itn.followup.send(
+                                t("notification.remove.success", username=username),
+                                ephemeral=True,
+                            )
+                            await cursor.execute(
+                                "SELECT user_id FROM notification WHERE user_id = ? AND enabled = 1",
+                                (match_notifier["user_id"],),
+                            )
 
                             active_notifiers = await cursor.fetchall()
                             if not active_notifiers:
-                                await cursor.execute('UPDATE user SET enabled = 0 WHERE id = ?', (match_notifier['user_id'],))
+                                await cursor.execute(
+                                    "UPDATE user SET enabled = 0 WHERE id = ?",
+                                    (match_notifier["user_id"],),
+                                )
                             await db.commit()
-                            
+
                         if not active_notifiers:
                             await self.account_tracker.removeTask(username)
-                            
-                            if configs['auto_unfollow'] or configs['auto_turn_off_notification']:
-                                await cursor.execute('SELECT client_used FROM user WHERE id = ?', (match_notifier['user_id'],))
+
+                            if (
+                                configs["auto_unfollow"]
+                                or configs["auto_turn_off_notification"]
+                            ):
+                                await cursor.execute(
+                                    "SELECT client_used FROM user WHERE id = ?",
+                                    (match_notifier["user_id"],),
+                                )
                                 result = await cursor.fetchone()
-                                client_used = result['client_used']
+                                client_used = result["client_used"]
                                 app = Twitter(client_used)
                                 await app.connect()
                                 target_user = await app.get_user_info(username)
 
-                                if configs['auto_unfollow']:
+                                if configs["auto_unfollow"]:
                                     status = await app.unfollow_user(target_user)
-                                    log.info(f'successfully unfollowed {username}') if status else log.warning(f'unable to unfollow {username}')
+                                    log.info(
+                                        f"successfully unfollowed {username}"
+                                    ) if status else log.warning(
+                                        f"unable to unfollow {username}"
+                                    )
                                 else:
-                                    status = await app.disable_user_notification(target_user)
-                                    log.info(f'successfully turned off notification for {username}') if status else log.warning(f'unable to turn off notifications for {username}')
-                                    
+                                    status = await app.disable_user_notification(
+                                        target_user
+                                    )
+                                    log.info(
+                                        f"successfully turned off notification for {username}"
+                                    ) if status else log.warning(
+                                        f"unable to turn off notifications for {username}"
+                                    )
+
                             await update_presence(self.bot)
                     else:
-                        await itn.followup.send(t('notification.remove.not_found', username=username, channel_id=channel_id), ephemeral=True)
+                        await itn.followup.send(
+                            t(
+                                "notification.remove.not_found",
+                                username=username,
+                                channel_id=channel_id,
+                            ),
+                            ephemeral=True,
+                        )
                 except Exception as e:
-                    log.error(f'an error occurred while removing notifier: {e}')
-                    await itn.followup.send(t('notification.remove.failed'), ephemeral=True)
+                    log.error(f"an error occurred while removing notifier: {e}")
+                    await itn.followup.send(
+                        t("notification.remove.failed"), ephemeral=True
+                    )
                     await db.rollback()
 
-    @customize_group.command(name='message', description=t('commands.customize.message.description'))
-    @app_commands.rename(channel_id='channel')
-    @app_commands.describe(
-        channel_id=t('commands.customize.message.params.channel'),
-        username=t('commands.customize.message.params.username'),
-        default=t('commands.customize.message.params.default'),
+    @customize_group.command(
+        name="message", description=t("commands.customize.message.description")
     )
-    async def customize_message(self, itn: discord.Interaction, channel_id: str, username: str, default: bool = False):
+    @app_commands.rename(channel_id="channel")
+    @app_commands.describe(
+        channel_id=t("commands.customize.message.params.channel"),
+        username=t("commands.customize.message.params.username"),
+        default=t("commands.customize.message.params.default"),
+    )
+    async def customize_message(
+        self,
+        itn: discord.Interaction,
+        channel_id: str,
+        username: str,
+        default: bool = False,
+    ):
         """Set customized messages for notification.
 
         Parameters
@@ -249,37 +478,66 @@ class Notification(Cog_Extension):
         """
         channel = itn.guild.get_channel_or_thread(int(channel_id))
         if channel is None:
-            await itn.response.send_message(t('notification.customize.message.channel_not_found', channel_id=channel_id), ephemeral=True)
+            await itn.response.send_message(
+                t(
+                    "notification.customize.message.channel_not_found",
+                    channel_id=channel_id,
+                ),
+                ephemeral=True,
+            )
             return
-        
-        async with aiosqlite.connect(os.path.join(os.getenv('DATA_PATH'), 'tracked_accounts.db')) as db:
-            await db.execute('PRAGMA synchronous = OFF')
-            await db.execute('PRAGMA count_changes = OFF')
+
+        async with aiosqlite.connect(
+            os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
+        ) as db:
+            await db.execute("PRAGMA synchronous = OFF")
+            await db.execute("PRAGMA count_changes = OFF")
 
             db.row_factory = aiosqlite.Row
             async with db.cursor() as cursor:
-
-                await cursor.execute('SELECT user_id FROM notification, user WHERE username = ? COLLATE NOCASE AND channel_id = ? AND user_id = id AND notification.enabled = 1', (username, str(channel.id)))
+                await cursor.execute(
+                    "SELECT user_id FROM notification, user WHERE username = ? COLLATE NOCASE AND channel_id = ? AND user_id = id AND notification.enabled = 1",
+                    (username, str(channel.id)),
+                )
                 match_notifier = await cursor.fetchone()
                 if match_notifier is not None:
                     if default:
                         await itn.response.defer(ephemeral=True)
                         async with lock:
-                            await cursor.execute('UPDATE notification SET customized_msg = ? WHERE user_id = ? AND channel_id = ?', (None, match_notifier['user_id'], str(channel.id)))
+                            await cursor.execute(
+                                "UPDATE notification SET customized_msg = ? WHERE user_id = ? AND channel_id = ?",
+                                (None, match_notifier["user_id"], str(channel.id)),
+                            )
                             await db.commit()
-                        await itn.followup.send(t('notification.customize.message.success_default'), ephemeral=True)
+                        await itn.followup.send(
+                            t("notification.customize.message.success_default"),
+                            ephemeral=True,
+                        )
                     else:
-                        modal = CustomizeMsgModal(match_notifier['user_id'], username, channel)
+                        modal = CustomizeMsgModal(
+                            match_notifier["user_id"], username, channel
+                        )
                         await itn.response.send_modal(modal)
                 else:
-                    await itn.response.send_message(t('notification.customize.message.notifier_not_found', username=username, channel_mention=channel.mention), ephemeral=True)
-                    
-    @customize_group.command(name='translation', description=t('commands.customize.translation.description'))
-    @app_commands.describe(
-        username=t('commands.customize.translation.params.username'),
-        language=t('commands.customize.translation.params.language'),
+                    await itn.response.send_message(
+                        t(
+                            "notification.customize.message.notifier_not_found",
+                            username=username,
+                            channel_mention=channel.mention,
+                        ),
+                        ephemeral=True,
+                    )
+
+    @customize_group.command(
+        name="translation", description=t("commands.customize.translation.description")
     )
-    async def customize_translation(self, itn: discord.Interaction, username: str, language: str = None):
+    @app_commands.describe(
+        username=t("commands.customize.translation.params.username"),
+        language=t("commands.customize.translation.params.language"),
+    )
+    async def customize_translation(
+        self, itn: discord.Interaction, username: str, language: str = None
+    ):
         """Set customized translation language for a tracked account.
 
         Parameters
@@ -289,67 +547,130 @@ class Notification(Cog_Extension):
         language: str
             The language code you want to translate to (e.g. en, ja). Leave it empty to use default.
         """
-        if configs['embed']['type'] != 'proxy' or not configs['embed']['proxy']['auto_translation']['enabled']:
-            await itn.response.send_message(t('notification.customize.translation.not_enabled'), ephemeral=True)
+        if (
+            configs["embed"]["type"] != "proxy"
+            or not configs["embed"]["proxy"]["auto_translation"]["enabled"]
+        ):
+            await itn.response.send_message(
+                t("notification.customize.translation.not_enabled"), ephemeral=True
+            )
             return
 
         lang_code = validate_and_normalize_language(language)
         if language and lang_code is None:
-            await itn.response.send_message(t('notification.customize.translation.invalid_lang'), ephemeral=True)
+            await itn.response.send_message(
+                t("notification.customize.translation.invalid_lang"), ephemeral=True
+            )
             return
 
         await itn.response.defer(ephemeral=True)
 
-        async with aiosqlite.connect(os.path.join(os.getenv('DATA_PATH'), 'tracked_accounts.db')) as db:
-            await db.execute('PRAGMA synchronous = OFF')
-            await db.execute('PRAGMA count_changes = OFF')
+        async with aiosqlite.connect(
+            os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
+        ) as db:
+            await db.execute("PRAGMA synchronous = OFF")
+            await db.execute("PRAGMA count_changes = OFF")
 
             db.row_factory = aiosqlite.Row
             async with db.cursor() as cursor:
-                await cursor.execute('SELECT user.id FROM user JOIN notification ON user.id = notification.user_id JOIN channel ON notification.channel_id = channel.id WHERE username = ? COLLATE NOCASE AND channel.server_id = ? AND notification.enabled = 1', (username, str(itn.guild_id)))
+                await cursor.execute(
+                    "SELECT user.id FROM user JOIN notification ON user.id = notification.user_id JOIN channel ON notification.channel_id = channel.id WHERE username = ? COLLATE NOCASE AND channel.server_id = ? AND notification.enabled = 1",
+                    (username, str(itn.guild_id)),
+                )
                 match_user = await cursor.fetchone()
                 if match_user is not None:
                     async with lock:
-                        await cursor.execute('INSERT OR REPLACE INTO server_user_config (server_id, user_id, translate) VALUES (?, ?, ?)', (str(itn.guild_id), match_user['id'], lang_code))
+                        await cursor.execute(
+                            "INSERT OR REPLACE INTO server_user_config (server_id, user_id, translate) VALUES (?, ?, ?)",
+                            (str(itn.guild_id), match_user["id"], lang_code),
+                        )
                         await db.commit()
-                    
-                    if language is None:
-                        await itn.followup.send(t('notification.customize.translation.success_default', username=username, default_lang=configs['embed']['proxy']['auto_translation']['default_language']), ephemeral=True)
-                    else:
-                        await itn.followup.send(t('notification.customize.translation.success_set', username=username, lang_code=lang_code), ephemeral=True)
-                else:
-                    await itn.followup.send(t('notification.customize.translation.user_not_found', username=username), ephemeral=True)
 
-    @r_notifier.autocomplete('channel_id')
-    async def get_channels_for_r_notifier(self, itn: discord.Interaction, input_channel: str) -> list[app_commands.Choice[str]]:        
+                    if language is None:
+                        await itn.followup.send(
+                            t(
+                                "notification.customize.translation.success_default",
+                                username=username,
+                                default_lang=configs["embed"]["proxy"][
+                                    "auto_translation"
+                                ]["default_language"],
+                            ),
+                            ephemeral=True,
+                        )
+                    else:
+                        await itn.followup.send(
+                            t(
+                                "notification.customize.translation.success_set",
+                                username=username,
+                                lang_code=lang_code,
+                            ),
+                            ephemeral=True,
+                        )
+                else:
+                    await itn.followup.send(
+                        t(
+                            "notification.customize.translation.user_not_found",
+                            username=username,
+                        ),
+                        ephemeral=True,
+                    )
+
+    @r_notifier.autocomplete("channel_id")
+    async def get_channels_for_r_notifier(
+        self, itn: discord.Interaction, input_channel: str
+    ) -> list[app_commands.Choice[str]]:
         return await fetch_tracked_channels(itn, input_channel, include_unknown=True)
 
-    @customize_message.autocomplete('channel_id')
-    async def get_channels_for_customize_message(self, itn: discord.Interaction, input_channel: str) -> list[app_commands.Choice[str]]:
+    @customize_message.autocomplete("channel_id")
+    async def get_channels_for_customize_message(
+        self, itn: discord.Interaction, input_channel: str
+    ) -> list[app_commands.Choice[str]]:
         return await fetch_tracked_channels(itn, input_channel, include_unknown=False)
 
-    @r_notifier.autocomplete('username')
-    @customize_message.autocomplete('username')
-    async def get_enabled_users(self, itn: discord.Interaction, username: str) -> list[app_commands.Choice[str]]:
-        selected_channel_id = itn.data['options'][0]['options'][0]['value']
+    @r_notifier.autocomplete("username")
+    @customize_message.autocomplete("username")
+    async def get_enabled_users(
+        self, itn: discord.Interaction, username: str
+    ) -> list[app_commands.Choice[str]]:
+        selected_channel_id = itn.data["options"][0]["options"][0]["value"]
         if selected_channel_id is None:
             return []
 
-        async with connect_readonly(os.path.join(os.getenv('DATA_PATH'), 'tracked_accounts.db')) as db:
+        async with connect_readonly(
+            os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
+        ) as db:
             db.row_factory = aiosqlite.Row
             async with db.cursor() as cursor:
-                await cursor.execute('SELECT user.username FROM user JOIN notification ON user.id = notification.user_id WHERE notification.channel_id = ? AND notification.enabled = 1', (selected_channel_id,))
-                users = [row['username'] async for row in cursor]
-                return [app_commands.Choice(name=row, value=row) for row in users if username.lower() in row.lower()]
+                await cursor.execute(
+                    "SELECT user.username FROM user JOIN notification ON user.id = notification.user_id WHERE notification.channel_id = ? AND notification.enabled = 1",
+                    (selected_channel_id,),
+                )
+                users = [row["username"] async for row in cursor]
+                return [
+                    app_commands.Choice(name=row, value=row)
+                    for row in users
+                    if username.lower() in row.lower()
+                ]
 
-    @customize_translation.autocomplete('username')
-    async def get_guild_enabled_users(self, itn: discord.Interaction, username: str) -> list[app_commands.Choice[str]]:
-        async with connect_readonly(os.path.join(os.getenv('DATA_PATH'), 'tracked_accounts.db')) as db:
+    @customize_translation.autocomplete("username")
+    async def get_guild_enabled_users(
+        self, itn: discord.Interaction, username: str
+    ) -> list[app_commands.Choice[str]]:
+        async with connect_readonly(
+            os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
+        ) as db:
             db.row_factory = aiosqlite.Row
             async with db.cursor() as cursor:
-                await cursor.execute('SELECT user.username FROM user JOIN notification ON user.id = notification.user_id JOIN channel ON notification.channel_id = channel.id WHERE channel.server_id = ? AND notification.enabled = 1', (str(itn.guild_id),))
-                users = [row['username'] async for row in cursor]
-                return [app_commands.Choice(name=row, value=row) for row in users if username.lower() in row.lower()]
+                await cursor.execute(
+                    "SELECT user.username FROM user JOIN notification ON user.id = notification.user_id JOIN channel ON notification.channel_id = channel.id WHERE channel.server_id = ? AND notification.enabled = 1",
+                    (str(itn.guild_id),),
+                )
+                users = [row["username"] async for row in cursor]
+                return [
+                    app_commands.Choice(name=row, value=row)
+                    for row in users
+                    if username.lower() in row.lower()
+                ]
 
 
 async def setup(bot: commands.Bot):

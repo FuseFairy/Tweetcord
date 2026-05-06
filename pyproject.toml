@@ -1,0 +1,21 @@
+[project]
+name = "tweetcord"
+version = "0.1.0"
+description = "A Discord/QQ bot for Twitter notifications, using tweety-ns module."
+readme = "docs/README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiosqlite==0.18.0",
+    "discord-py==2.3.2",
+    "python-dotenv==1.2.2",
+    "pyyaml==6.0.1",
+    "tweety-ns>=2.4.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.12",
+]
+
+[tool.uv.sources]
+tweety-ns = { git = "https://github.com/mahrtayyab/tweety.git" }
