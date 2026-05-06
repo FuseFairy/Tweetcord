@@ -5,5 +5,6 @@ LABEL org.opencontainers.image.licenses="MIT"
 WORKDIR /bot
 COPY requirements.txt /bot/
 RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade --force-reinstall git+https://github.com/mahrtayyab/tweety.git
 COPY . /bot
 CMD ["python", "bot.py"]
