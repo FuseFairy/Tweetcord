@@ -1,4 +1,5 @@
 import os
+
 import aiosqlite
 import discord
 from discord import app_commands
@@ -7,20 +8,20 @@ from tweety import Twitter
 
 from configs.load_configs import configs
 from core.classes import Cog_Extension
-from src.i18n import t
+from src.db_function.readonly_db import connect_readonly
 from src.discord_ui.fetch_tracked_channels import fetch_tracked_channels
 from src.discord_ui.modal import CustomizeMsgModal
+from src.i18n import t
 from src.log import setup_logger
 from src.notification.account_tracker import AccountTracker
 from src.permission import ADMINISTRATOR
-from src.db_function.readonly_db import connect_readonly
+from src.presence_updater import update_presence
 from src.utils import (
     get_accounts,
     get_lock,
     get_utcnow,
     validate_and_normalize_language,
 )
-from src.presence_updater import update_presence
 
 log = setup_logger(__name__)
 lock = get_lock()
@@ -95,6 +96,7 @@ class Notification(Cog_Extension):
         enable_type=t("commands.add.notifier.params.type"),
         media_type=t("commands.add.notifier.params.media_type"),
         account_used=t("commands.add.notifier.params.account_used"),
+        qq_group_id=t("commands.add.notifier.params.qq_group_id"),
     )
     async def notifier(
         self,
@@ -105,6 +107,7 @@ class Notification(Cog_Extension):
         enable_type: str = "11",
         media_type: str = "11",
         account_used: str = list(get_accounts().keys())[0],
+        qq_group_id: str = None,
     ):
         """Add a twitter user to specific channel on your server.
 
@@ -122,6 +125,8 @@ class Notification(Cog_Extension):
             Whether to enable notifications for All Tweets, Tweets with Media, or Tweets without Media Only.
         account_used: str
             The account used to deliver notifications.
+        qq_group_id: str
+            The QQ group id to which the bot delivers notifications.
         """
 
         await itn.response.defer(ephemeral=True)
@@ -171,13 +176,14 @@ class Notification(Cog_Extension):
                                     (str(channel.id), server_id),
                                 )
                                 await cursor.execute(
-                                    "INSERT INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)",
+                                    "INSERT INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type, qq_group_id) VALUES (?, ?, ?, ?, ?, ?)",
                                     (
                                         str(new_user.id),
                                         str(channel.id),
                                         roleID,
                                         enable_type,
                                         media_type,
+                                        qq_group_id,
                                     ),
                                 )
                                 await db.commit()
@@ -249,13 +255,14 @@ class Notification(Cog_Extension):
                                     (str(channel.id), server_id),
                                 )
                                 await cursor.execute(
-                                    "REPLACE INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)",
+                                    "REPLACE INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type, qq_group_id) VALUES (?, ?, ?, ?, ?, ?)",
                                     (
                                         match_user["id"],
                                         str(channel.id),
                                         roleID,
                                         enable_type,
                                         media_type,
+                                        qq_group_id,
                                     ),
                                 )
                                 await cursor.execute(
@@ -283,13 +290,14 @@ class Notification(Cog_Extension):
                                 (str(channel.id), server_id),
                             )
                             await cursor.execute(
-                                "REPLACE INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type) VALUES (?, ?, ?, ?, ?)",
+                                "REPLACE INTO notification (user_id, channel_id, role_id, enable_type, enable_media_type, qq_group_id) VALUES (?, ?, ?, ?, ?, ?)",
                                 (
                                     match_user["id"],
                                     str(channel.id),
                                     roleID,
                                     enable_type,
                                     media_type,
+                                    qq_group_id,
                                 ),
                             )
                             await db.commit()

@@ -55,7 +55,7 @@ class ListUsers(Cog_Extension):
         ) as db:
             async with db.execute(
                 """
-                SELECT user.username, channel.id, notification.role_id, notification.enable_type, notification.enable_media_type, user.client_used
+                SELECT user.username, channel.id, notification.role_id, notification.enable_type, notification.enable_media_type, user.client_used, notification.qq_group_id
                 FROM user
                 JOIN notification
                 ON user.id = notification.user_id
@@ -70,7 +70,7 @@ class ListUsers(Cog_Extension):
                 user_channel_role_data = await cursor.fetchall()
 
         formatted_data = [
-            f"{i + 1}. ```{username}``` <#{channel_id}>{f' <@&{role_id}>' if role_id else ''} {symbol(enable_type[0])}{t('list.label_retweet')} {symbol(enable_type[1])}{t('list.label_quote')} {symbol(enable_media_type[0])}{t('list.label_text')} {symbol(enable_media_type[1])}{t('list.label_media')}, {t('list.label_using')} {client_used}"
+            f"{i + 1}. ```{username}``` <#{channel_id}>{f' <@&{role_id}>' if role_id else ''} {symbol(enable_type[0])}{t('list.label_retweet')} {symbol(enable_type[1])}{t('list.label_quote')} {symbol(enable_media_type[0])}{t('list.label_text')} {symbol(enable_media_type[1])}{t('list.label_media')} {CHECK if qq_group_id else XMARK}{t('list.label_qq')}, {t('list.label_using')} {client_used}"
             for i, (
                 username,
                 channel_id,
@@ -78,6 +78,7 @@ class ListUsers(Cog_Extension):
                 enable_type,
                 enable_media_type,
                 client_used,
+                qq_group_id,
             ) in enumerate(user_channel_role_data)
         ]
 

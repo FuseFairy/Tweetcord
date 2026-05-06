@@ -18,6 +18,8 @@ auto_unfollow: true
 auto_repair_mismatched_clients: false
 init_latest_tweet_on_startup: false
 
+napcat_base_url: 'http://127.0.0.1:3000'
+
 embed:
   type: 'built_in'
 

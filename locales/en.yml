@@ -34,6 +34,7 @@ list:
   label_quote: 'quote'
   label_text: 'text'
   label_media: 'media'
+  label_qq: 'QQ Group'
   label_using: 'using'
 
 modal:
@@ -74,6 +75,7 @@ commands:
         type: 'Whether to enable notifications for retweets & quotes.'
         media_type: 'Whether to enable notifications for All Tweets, Tweets with Media, or Tweets without Media Only.'
         account_used: 'The account used to deliver notifications.'
+        qq_group_id: 'QQ Group ID (optional)'
       choices:
         enable_type:
           all_default: 'All (default)'

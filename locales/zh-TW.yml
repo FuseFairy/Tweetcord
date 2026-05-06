@@ -34,6 +34,7 @@ list:
   label_quote: '引用'
   label_text: '文字'
   label_media: '媒體'
+  label_qq: 'QQ 群'
   label_using: '使用'
 
 modal:
@@ -74,6 +75,7 @@ commands:
         type: '設定是否啟用轉推和引用的通知'
         media_type: '設定是否啟用包含多媒體的通知，或僅啟用包含多媒體的通知'
         account_used: '用來追蹤用戶推文的Twitter客戶端'
+        qq_group_id: 'QQ 群號（可選）'
       choices:
         enable_type:
           all_default: '全部（預設）'

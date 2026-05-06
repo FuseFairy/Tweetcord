@@ -1,23 +1,25 @@
 import asyncio
+import base64
 import os
-import sys
 import re
-from datetime import datetime, timezone, timedelta
+import sys
+from datetime import datetime, timedelta, timezone
 
+import aiohttp
 import aiosqlite
 import discord
 from discord.ext import commands
 from tweety import Twitter
 
 from configs.load_configs import configs
+from src.db_function.init_db import init_latest_tweet_on_startup
+from src.db_function.readonly_db import connect_readonly
 from src.i18n import t
 from src.log import setup_logger
 from src.notification.display_tools import gen_embed, get_action
 from src.notification.get_tweets import get_tweets
 from src.notification.utils import is_match_media_type, is_match_type, replace_emoji
 from src.utils import get_accounts, get_lock, get_utcnow
-from src.db_function.readonly_db import connect_readonly
-from src.db_function.init_db import init_latest_tweet_on_startup
 
 EMBED_TYPE: str = configs["embed"]["type"]
 SERVICE: str = configs["embed"]["proxy"]["service"]
@@ -31,6 +33,7 @@ lock = get_lock()
 class AccountTracker:
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.session = aiohttp.ClientSession()
         self.accounts_data = get_accounts()
         self.db_path = os.path.join(os.getenv("DATA_PATH"), "tracked_accounts.db")
         self.tweets = {account_name: [] for account_name in self.accounts_data.keys()}
@@ -62,7 +65,7 @@ class AccountTracker:
                 try:
                     await app.load_auth_token(account_token)
                     return app
-                except Exception as e:
+                except Exception:
                     log.error(
                         f"authentication failed for account: {account_name} [Attempt {attempt + 1}/{max_attempts}]"
                     )
@@ -290,6 +293,11 @@ class AccountTracker:
                                     view=view,
                                 )
 
+                            if data["qq_group_id"]:
+                                await self.send_to_qq(
+                                    data["qq_group_id"], tweet.text, tweet
+                                )
+
                         except Exception as e:
                             if not isinstance(e, discord.errors.Forbidden):
                                 log.error(
@@ -394,3 +402,86 @@ class AccountTracker:
                 task.cancel()
                 log.info(f"task {username} has been cancelled")
                 break
+
+    async def send_to_qq(self, group_id, text, tweet):
+        napcat_url = configs.get("napcat_base_url")
+        api_url = f"{napcat_url}/send_group_msg"
+        token = os.getenv("NAPCAT_TOKEN")
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+
+        async def get_image_data(url):
+            try:
+                async with self.session.get(url) as resp:
+                    if resp.status == 200:
+                        img_data = await resp.read()
+                        return f"base64://{base64.b64encode(img_data).decode('utf-8')}"
+                    else:
+                        log.error(f"failed to fetch image for QQ: status {resp.status}")
+            except Exception as e:
+                log.error(f"error fetching image for QQ: {e}")
+            return None
+
+        message_data = []
+        # Add text
+        message_data.append({"type": "text", "data": {"text": text}})
+
+        # Add images
+        if tweet.media:
+            if len(tweet.media) > 1 and configs["embed"]["built_in"]["fx_image"]:
+                try:
+                    async with self.session.get(
+                        re.sub(r"twitter", r"fxtwitter", tweet.url)
+                    ) as response:
+                        raw = await response.text()
+                    from bs4 import BeautifulSoup
+
+                    soup = BeautifulSoup(raw, "html.parser")
+                    meta_image = soup.find("meta", property="og:image")
+                    if meta_image:
+                        image_url = meta_image["content"]
+                        img_b64 = await get_image_data(image_url)
+                        if img_b64:
+                            message_data.append(
+                                {"type": "image", "data": {"file": img_b64}}
+                            )
+                    else:
+                        for media in tweet.media:
+                            if media.type == "photo":
+                                img_b64 = await get_image_data(media.media_url_https)
+                                if img_b64:
+                                    message_data.append(
+                                        {"type": "image", "data": {"file": img_b64}}
+                                    )
+                except Exception as e:
+                    log.error(f"failed to fetch fx_image for QQ: {e}")
+                    # Fallback to individual images
+                    for media in tweet.media:
+                        if media.type == "photo":
+                            img_b64 = await get_image_data(media.media_url_https)
+                            if img_b64:
+                                message_data.append(
+                                    {"type": "image", "data": {"file": img_b64}}
+                                )
+            else:
+                for media in tweet.media:
+                    if media.type == "photo":
+                        img_b64 = await get_image_data(media.media_url_https)
+                        if img_b64:
+                            message_data.append(
+                                {"type": "image", "data": {"file": img_b64}}
+                            )
+
+        payload = {"group_id": int(group_id), "message": message_data}
+
+        try:
+            async with self.session.post(
+                api_url, headers=headers, json=payload
+            ) as response:
+                if response.status != 200:
+                    log.error(f"failed to send to QQ: status {response.status}")
+        except Exception as e:
+            log.error(f"error sending to QQ: {e}")
