@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: yuuzi261/tweetcord
+  IMAGE_NAME: FuseFairy/tweetcord-qq
   IMAGE_DESCRIPTION: A Discord bot for Twitter notifications, using tweety-ns module.
   LICENSES: MIT
   PLATFORMS: linux/amd64,linux/arm64
