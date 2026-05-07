@@ -446,7 +446,9 @@ class AccountTracker:
 
         message_data = []
         # Add text
-        message_data.append({"type": "text", "data": {"text": text}})
+        message_data.append(
+            {"type": "text", "data": {"text": text.replace("<br>", "\n")}}
+        )
 
         for url in image_urls:
             img_b64 = await get_image_data(url)
