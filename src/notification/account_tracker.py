@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import aiohttp
 import aiosqlite
 import discord
+from bs4 import BeautifulSoup
 from discord.ext import commands
 from tweety import Twitter
 
@@ -294,9 +295,7 @@ class AccountTracker:
                                 )
 
                             if data["qq_group_id"]:
-                                await self.send_to_qq(
-                                    data["qq_group_id"], tweet.text, tweet
-                                )
+                                await self.send_to_qq(data["qq_group_id"], tweet)
 
                         except Exception as e:
                             if not isinstance(e, discord.errors.Forbidden):
@@ -403,7 +402,7 @@ class AccountTracker:
                 log.info(f"task {username} has been cancelled")
                 break
 
-    async def send_to_qq(self, group_id, text, tweet):
+    async def send_to_qq(self, group_id, tweet):
         napcat_url = configs.get("napcat_base_url")
         api_url = f"{napcat_url}/send_group_msg"
         token = os.getenv("NAPCAT_TOKEN")
@@ -425,19 +424,34 @@ class AccountTracker:
                 log.error(f"error fetching image for QQ: {e}")
             return None
 
+        # Add images and text
+        image_urls = []
+        text = tweet.text
+        try:
+            async with self.session.get(
+                re.sub(r"twitter", r"fxtwitter", tweet.url)
+            ) as resp:
+                soup = BeautifulSoup(await resp.text(), "html.parser")
+                text = soup.find("meta", property="og:description")["content"]
+                img_url = soup.find("meta", property="og:image")["content"]
+                if "mosaic" in img_url:
+                    image_urls = [
+                        f"https://pbs.twimg.com/media/{i}?format=jpg"
+                        for i in img_url.split("/")[5:]
+                    ]
+                else:
+                    image_urls = [img_url]
+        except Exception:
+            image_urls = [m.media_url_https for m in tweet.media if m.type == "photo"]
+
         message_data = []
         # Add text
         message_data.append({"type": "text", "data": {"text": text}})
 
-        # Add images
-        if tweet.media:
-            for media in tweet.media:
-                if media.type == "photo":
-                    img_b64 = await get_image_data(media.media_url_https)
-                    if img_b64:
-                        message_data.append(
-                            {"type": "image", "data": {"file": img_b64}}
-                        )
+        for url in image_urls:
+            img_b64 = await get_image_data(url)
+            if img_b64:
+                message_data.append({"type": "image", "data": {"file": img_b64}})
 
         payload = {"group_id": int(group_id), "message": message_data}
 
