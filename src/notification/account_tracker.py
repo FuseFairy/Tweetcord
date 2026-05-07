@@ -431,49 +431,13 @@ class AccountTracker:
 
         # Add images
         if tweet.media:
-            if len(tweet.media) > 1 and configs["embed"]["built_in"]["fx_image"]:
-                try:
-                    async with self.session.get(
-                        re.sub(r"twitter", r"fxtwitter", tweet.url)
-                    ) as response:
-                        raw = await response.text()
-                    from bs4 import BeautifulSoup
-
-                    soup = BeautifulSoup(raw, "html.parser")
-                    meta_image = soup.find("meta", property="og:image")
-                    if meta_image:
-                        image_url = meta_image["content"]
-                        img_b64 = await get_image_data(image_url)
-                        if img_b64:
-                            message_data.append(
-                                {"type": "image", "data": {"file": img_b64}}
-                            )
-                    else:
-                        for media in tweet.media:
-                            if media.type == "photo":
-                                img_b64 = await get_image_data(media.media_url_https)
-                                if img_b64:
-                                    message_data.append(
-                                        {"type": "image", "data": {"file": img_b64}}
-                                    )
-                except Exception as e:
-                    log.error(f"failed to fetch fx_image for QQ: {e}")
-                    # Fallback to individual images
-                    for media in tweet.media:
-                        if media.type == "photo":
-                            img_b64 = await get_image_data(media.media_url_https)
-                            if img_b64:
-                                message_data.append(
-                                    {"type": "image", "data": {"file": img_b64}}
-                                )
-            else:
-                for media in tweet.media:
-                    if media.type == "photo":
-                        img_b64 = await get_image_data(media.media_url_https)
-                        if img_b64:
-                            message_data.append(
-                                {"type": "image", "data": {"file": img_b64}}
-                            )
+            for media in tweet.media:
+                if media.type == "photo":
+                    img_b64 = await get_image_data(media.media_url_https)
+                    if img_b64:
+                        message_data.append(
+                            {"type": "image", "data": {"file": img_b64}}
+                        )
 
         payload = {"group_id": int(group_id), "message": message_data}
 
