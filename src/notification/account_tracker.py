@@ -424,44 +424,66 @@ class AccountTracker:
                 log.error(f"error fetching image for QQ: {e}")
             return None
 
-        # Add images and text
+        # Add images, video and text
         image_urls = []
+        video_urls = []
         text = tweet.text
         try:
             async with self.session.get(
                 re.sub(r"twitter", r"fxtwitter", tweet.url)
             ) as resp:
                 soup = BeautifulSoup(await resp.text(), "html.parser")
-                text = soup.find("meta", property="og:description")["content"]
-                img_url = soup.find("meta", property="og:image")["content"]
-                if "mosaic" in img_url:
-                    image_urls = [
-                        f"https://pbs.twimg.com/media/{i}?format=jpg"
-                        for i in img_url.split("/")[5:]
-                    ]
-                else:
-                    image_urls = [img_url]
+
+                desc_meta = soup.find("meta", property="og:description")
+                if desc_meta:
+                    text = desc_meta["content"]
+
+                # Collect all video URLs
+                for video_meta in soup.find_all(
+                    "meta", property=re.compile(r"^og:video(:secure_url)?$")
+                ):
+                    v_url = video_meta["content"]
+                    if v_url not in video_urls:
+                        video_urls.append(v_url)
+
+                img_meta = soup.find("meta", property="og:image")
+                if img_meta:
+                    img_url = img_meta["content"]
+                    if "mosaic" in img_url:
+                        image_urls.extend(
+                            [
+                                f"https://pbs.twimg.com/media/{i}?format=jpg"
+                                for i in img_url.split("/")[5:]
+                            ]
+                        )
+                    else:
+                        image_urls.append(img_url)
         except Exception:
             image_urls = [m.media_url_https for m in tweet.media if m.type == "photo"]
+            video_urls = [m.expanded_url for m in tweet.media if m.type == "video"]
 
-        message_data = []
-        # Add text
-        message_data.append(
-            {"type": "text", "data": {"text": text.replace("<br>", "\n")}}
-        )
+        async def send_msg(message):
+            payload = {"group_id": int(group_id), "message": message}
+            try:
+                async with self.session.post(
+                    api_url, headers=headers, json=payload
+                ) as response:
+                    if response.status != 200:
+                        log.error(f"failed to send to QQ: status {response.status}")
+            except Exception as e:
+                log.error(f"error sending to QQ: {e}")
 
+        # Construct combined text and image message
+        combined_msg = [{"type": "text", "data": {"text": text.replace("<br>", "\n")}}]
         for url in image_urls:
             img_b64 = await get_image_data(url)
             if img_b64:
-                message_data.append({"type": "image", "data": {"file": img_b64}})
+                combined_msg.append({"type": "image", "data": {"file": img_b64}})
 
-        payload = {"group_id": int(group_id), "message": message_data}
+        # Send text and images together first
+        await send_msg(combined_msg)
 
-        try:
-            async with self.session.post(
-                api_url, headers=headers, json=payload
-            ) as response:
-                if response.status != 200:
-                    log.error(f"failed to send to QQ: status {response.status}")
-        except Exception as e:
-            log.error(f"error sending to QQ: {e}")
+        # Send each video separately with 1s interval
+        for v_url in video_urls:
+            await asyncio.sleep(1)
+            await send_msg([{"type": "video", "data": {"file": v_url, "url": v_url}}])
