@@ -485,5 +485,8 @@ class AccountTracker:
 
         # Send each video separately with 1s interval
         for v_url in video_urls:
+            if "youtube" in v_url:
+                continue
+
             await asyncio.sleep(1)
             await send_msg([{"type": "video", "data": {"file": v_url, "url": v_url}}])
