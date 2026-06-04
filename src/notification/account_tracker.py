@@ -1,5 +1,4 @@
 import asyncio
-import base64
 import os
 import re
 import sys
@@ -412,18 +411,6 @@ class AccountTracker:
             "Authorization": f"Bearer {token}",
         }
 
-        async def get_image_data(url):
-            try:
-                async with self.session.get(url) as resp:
-                    if resp.status == 200:
-                        img_data = await resp.read()
-                        return f"base64://{base64.b64encode(img_data).decode('utf-8')}"
-                    else:
-                        log.error(f"failed to fetch image for QQ: status {resp.status}")
-            except Exception as e:
-                log.error(f"error fetching image for QQ: {e}")
-            return None
-
         # Add images, video and text
         image_urls = []
         video_urls = []
@@ -476,9 +463,7 @@ class AccountTracker:
         # Construct combined text and image message
         combined_msg = [{"type": "text", "data": {"text": text.replace("<br>", "\n")}}]
         for url in image_urls:
-            img_b64 = await get_image_data(url)
-            if img_b64:
-                combined_msg.append({"type": "image", "data": {"file": img_b64}})
+            combined_msg.append({"type": "image", "data": {"file": url}})
 
         # Send text and images together first
         await send_msg(combined_msg)
